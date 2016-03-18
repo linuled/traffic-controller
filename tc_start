@@ -1,0 +1,108 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides: redConfig
+# Required-Start: $network
+# Required-Stop: $network
+# Default-Start: 2 3 5
+# Description: Configuracion de la red, para trabajar como router.
+### END INIT INFO
+
+#=| RATES |========================================================================================================
+RT00=102400         # 12.5Mbyte
+RT01=4096           # 480Kbyte
+RT02=2048           # 240Kbyte
+RT03=1024           # 120Kbyte
+RT04=480            # 60Kbyte
+RT05=240            # 30Kbyte
+RT06=80             # 10Kbyte
+RT07=40             # 5Kbyte
+
+#=| IPs |==========================================================================================================
+NET00=0.0.0.0/0        # Todas las redes
+NET01=192.168.1.0/24   # Red cableada eth1
+
+#=| IPs |==========================================================================================================
+IP01=192.168.1.1      # modem
+IP02=192.168.1.2      # rpi
+
+IP10=192.168.1.10     # pc-claudio
+IP11=192.168.1.11     # pc-natalie
+IP12=192.168.1.12     # pc-sebastian
+IP13=192.168.1.13     # pc-papa
+
+IP20=192.168.1.20     # cel-claudio
+IP21=192.168.1.21     # cel-natalie
+IP22=192.168.1.22     # cel-sebastian
+IP23=192.168.1.23     # cel-papa
+IP23=192.168.1.24     # cel-mama
+
+IP00=192.168.1.128    # 
+
+IP90=162.243.205.208  # Servidor VPS1 DEV
+IP91=107.170.175.115  # Servidor VPS2 PRO
+
+#=| DEV |==========================================================================================================
+ETH0=eth0
+
+#=| BORRAR CONFIGURACION ANTERIOR |================================================================================
+tc qdisc del dev $ETH0 root 2>&1 >/dev/null
+tc qdisc del dev $ETH0 ingress 2>&1 >/dev/null
+
+#=| DESCARGA |=====================================================================================================
+## Clase Root y Master
+tc qdisc add dev $ETH0 root handle 1: htb default 10
+tc class add dev $ETH0 parent 1: classid 1:1 htb rate ${RT00}kbit burst 6k
+
+
+
+# Clases
+tc class add dev $ETH0 parent 1:1 classid 1:10 htb rate ${RT00}kbit burst 6k prio 00  # 12.5Mb
+tc class add dev $ETH0 parent 1:1 classid 1:20 htb rate ${RT01}kbit burst 6k prio 10  # 480kb
+tc class add dev $ETH0 parent 1:1 classid 1:30 htb rate ${RT02}kbit burst 6k prio 20  # 240kb
+tc class add dev $ETH0 parent 1:1 classid 1:40 htb rate ${RT03}kbit burst 6k prio 30  # 120kb
+tc class add dev $ETH0 parent 1:1 classid 1:50 htb rate ${RT04}kbit burst 6k prio 40  # 60kb
+tc class add dev $ETH0 parent 1:1 classid 1:60 htb rate ${RT05}kbit burst 6k prio 50  # 30kb
+tc class add dev $ETH0 parent 1:1 classid 1:70 htb rate ${RT06}kbit burst 6k prio 60  # 10kb
+
+tc qdisc add dev $ETH0 parent 1:10 handle 10: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:20 handle 20: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:30 handle 30: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:40 handle 40: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:50 handle 50: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:60 handle 60: sfq perturb 10
+tc qdisc add dev $ETH0 parent 1:70 handle 70: sfq perturb 10
+
+#Filtros
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 1 u32 match ip protocol 1 0xff flowid 1:10
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 0 u32 match ip src ${IP10} flowid 1:10
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 0 u32 match ip dst ${IP10} flowid 1:10
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 0 u32 match ip src ${IP10} flowid 1:10
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 0 u32 match ip src ${IP90} flowid 1:10
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 0 u32 match ip src ${IP91} flowid 1:10
+tc filter add dev $ETH0 parent 1:0 protocol ip prio 9 u32 match ip src ${IP00} flowid 1:30
+
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 00 u32 match ip sport 22 0xffff flowid 1:10     # SSH ORIGEN
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 00 u32 match ip sport 53 0xffff flowid 1:10     # DNS ORIGEN
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 99 u32 match ip sport 80 0xffff flowid 1:30    # HTTP ORIGEN
+#tc filter add dev $ETH0 parent 1:0 protocol ip prio 99 u32 match ip sport 443 0xffff flowid 1:30   # HTTPS ORIGEN
+
+#=| SUBIDA |==============================================
+tc qdisc add dev $ETH0 handle ffff: ingress
+tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip src ${NET00} police rate ${RT00}kbit burst 10k drop flowid :1
+
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip src ${IP10} police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip dst ${IP10} police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip dst ${IP10} police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip dst ${IP90} police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 0 u32 match ip dst ${IP91} police rate ${RT01}kbit burst 5k drop flowid :1
+tc filter add dev $ETH0 parent ffff: protocol ip prio 9 u32 match ip dst ${IP00} police rate ${RT05}kbit burst 5k drop flowid :1
+
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 00 u32 match ip dport 22 0xffff police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 00 u32 match ip dport 53 0xffff police rate ${RT01}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 99 u32 match ip dport 80 0xffff police rate ${RT05}kbit burst 5k drop flowid :1
+#tc filter add dev $ETH0 parent ffff: protocol ip prio 99 u32 match ip dport 443 0xffff police rate ${RT05}kbit burst 5k drop flowid :1
+
+#=========================================================
+echo "|-----------------------------------|"
+echo "| CONFIGURACION DE LA RED APLICADA  |"
+echo "|-----------------------------------|"

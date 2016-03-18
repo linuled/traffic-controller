@@ -1,0 +1,16 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides: redConfig
+# Required-Start: $network
+# Required-Stop: $network
+# Default-Start: 2 3 5
+# Description: Configuracion de la red, para trabajar como router.
+### END INIT INFO
+
+#=| DEV |=================================================
+ETH0=eth0
+
+#=| BORRAR CONFIGURACION ANTERIOR |=======================
+
+tc qdisc del dev $ETH0 root 2>&1 >/dev/null
+tc qdisc del dev $ETH0 ingress 2>&1 >/dev/null
